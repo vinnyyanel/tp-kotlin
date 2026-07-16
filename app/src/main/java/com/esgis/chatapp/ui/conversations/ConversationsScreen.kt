@@ -1,5 +1,6 @@
 package com.esgis.chatapp.ui.conversations
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -31,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +54,7 @@ fun ConversationsScreen(
     val state by viewModel.state.collectAsState()
     val contacts by viewModel.contacts.collectAsState()
     val message by viewModel.message.collectAsState()
+    val onlineUsers by viewModel.onlineUsers.collectAsState()
 
     var showContacts by remember { mutableStateOf(false) }
     var showPersonaPicker by remember { mutableStateOf(false) }
@@ -110,7 +116,8 @@ fun ConversationsScreen(
                     } else {
                         LazyColumn(Modifier.fillMaxSize()) {
                             items(s.conversations, key = { it.id }) { conv ->
-                                ConversationRow(conv) { onOpenChat(conv.id) }
+                                val isOnline = conv.otherUserId != null && conv.otherUserId in onlineUsers
+                                ConversationRow(conv, isOnline) { onOpenChat(conv.id) }
                                 HorizontalDivider()
                             }
                         }
@@ -143,7 +150,7 @@ fun ConversationsScreen(
 }
 
 @Composable
-private fun ConversationRow(conv: ConversationUi, onClick: () -> Unit) {
+private fun ConversationRow(conv: ConversationUi, isOnline: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -161,11 +168,29 @@ private fun ConversationRow(conv: ConversationUi, onClick: () -> Unit) {
                     fontWeight = FontWeight.SemiBold
                 )
             }
-            if (conv.isAiChat) {
-                Text(
+            when {
+                conv.isAiChat -> Text(
                     "Agent IA",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
+                )
+                isOnline -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(9.dp)
+                            .clip(CircleShape)
+                            .background(OnlineGreen)
+                    )
+                    Text(
+                        "  en ligne",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OnlineGreen
+                    )
+                }
+                else -> Text(
+                    "hors ligne",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -210,6 +235,8 @@ private fun ContactsDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Fermer") } }
     )
 }
+
+private val OnlineGreen = Color(0xFF2FBF4B)
 
 /** ISO 8601 -> "HH:mm" (best-effort, sans dépendance date). */
 private fun formatTime(iso: String): String {

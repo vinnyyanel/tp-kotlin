@@ -44,5 +44,6 @@ data class ConversationUi(
     val title: String,
     val isAiChat: Boolean,
     val aiPersona: String? = null,
-    val lastMessageAt: String? = null
+    val lastMessageAt: String? = null,
+    val otherUserId: String? = null
 )

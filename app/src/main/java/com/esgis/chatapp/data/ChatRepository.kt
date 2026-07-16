@@ -67,6 +67,15 @@ class ChatRepository {
             filter { eq("id", conversationId) }
         }.decodeSingleOrNull<Conversation>()
 
+    /** Id de l'autre participant d'une conversation humaine (pour la présence). */
+    suspend fun getOtherParticipantId(conversationId: String): String? {
+        val me = currentUserId
+        val parts = supabase.from("participants").select {
+            filter { eq("conversation_id", conversationId) }
+        }.decodeList<Participant>()
+        return parts.map { it.userId }.firstOrNull { it != me }
+    }
+
     /**
      * Liste unifiée des conversations de l'utilisateur, triée par dernier message.
      * Le RLS Supabase ne renvoie déjà QUE mes conversations (is_member).
@@ -97,7 +106,8 @@ class ChatRepository {
                     id = c.id,
                     title = name,
                     isAiChat = false,
-                    lastMessageAt = c.lastMessageAt
+                    lastMessageAt = c.lastMessageAt,
+                    otherUserId = otherId
                 )
             }
         }
