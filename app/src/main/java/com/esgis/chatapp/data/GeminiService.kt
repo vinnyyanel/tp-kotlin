@@ -2,7 +2,7 @@ package com.esgis.chatapp.data
 
 import com.esgis.chatapp.BuildConfig
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.android.Android
+import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsChannel
@@ -34,7 +34,7 @@ object GeminiService {
     private const val BASE_URL =
         "https://generativelanguage.googleapis.com/v1beta/models"
 
-    private val client = HttpClient(Android)
+    private val client = HttpClient(OkHttp)
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Un tour de conversation à envoyer au modèle. */

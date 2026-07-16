@@ -79,7 +79,8 @@ dependencies {
     implementation(libs.supabase.storage)
 
     // Ktor (moteur HTTP Supabase + appels Gemini streaming)
-    implementation(libs.ktor.client.android)
+    // OkHttp = moteur compatible WebSocket (requis par Supabase Realtime)
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)

@@ -39,7 +39,9 @@ supabase-auth = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
 supabase-realtime = { group = "io.github.jan-tennert.supabase", name = "realtime-kt" }
 supabase-storage = { group = "io.github.jan-tennert.supabase", name = "storage-kt" }
 # Ktor (client HTTP, requis par Supabase-kt + appels Gemini)
-ktor-client-android = { group = "io.ktor", name = "ktor-client-android", version.ref = "ktor" }
+# Moteur OkHttp : nécessaire pour les WebSockets de Supabase Realtime
+# (le moteur Android ne supporte pas les WebSockets).
+ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
