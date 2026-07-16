@@ -132,6 +132,24 @@ class ChatRepository {
         return convId
     }
 
+    /**
+     * Renvoie la conversation 1-à-1 existante avec cet utilisateur, ou la crée.
+     * Évite les doublons quand on ouvre un contact depuis l'annuaire.
+     */
+    suspend fun getOrCreateHumanConversation(otherUserId: String): String {
+        val me = currentUserId ?: error("Non authentifié")
+        val convs = supabase.from("conversations").select {
+            filter { eq("is_ai_chat", false) }
+        }.decodeList<Conversation>()
+        for (c in convs) {
+            val members = supabase.from("participants").select {
+                filter { eq("conversation_id", c.id) }
+            }.decodeList<Participant>().map { it.userId }.toSet()
+            if (members == setOf(me, otherUserId)) return c.id
+        }
+        return createHumanConversation(otherUserId)
+    }
+
     /** Crée une conversation avec l'agent IA (persona) et renvoie son id. */
     suspend fun createAiConversation(persona: AiPersona): String {
         val me = currentUserId ?: error("Non authentifié")

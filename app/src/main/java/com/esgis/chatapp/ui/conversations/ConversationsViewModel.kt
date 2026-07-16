@@ -61,7 +61,7 @@ class ConversationsViewModel : ViewModel() {
 
     fun startHumanChat(otherUserId: String, onReady: (String) -> Unit) {
         viewModelScope.launch {
-            runCatching { repo.createHumanConversation(otherUserId) }
+            runCatching { repo.getOrCreateHumanConversation(otherUserId) }
                 .onSuccess { refresh(); onReady(it) }
                 .onFailure { _message.value = it.message ?: "Impossible de créer la conversation." }
         }
