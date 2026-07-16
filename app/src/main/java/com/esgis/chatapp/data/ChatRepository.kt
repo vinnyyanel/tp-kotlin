@@ -12,6 +12,7 @@ import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -171,29 +172,42 @@ class ChatRepository {
     }
 
     // ---------- MÉDIAS (photo / audio) — P1 ----------
-    suspend fun uploadMedia(conversationId: String, bytes: ByteArray, fileName: String, type: String) {
+    /** Upload un média dans le bucket Storage puis insère le message. Renvoie le message créé. */
+    suspend fun uploadMedia(
+        conversationId: String,
+        bytes: ByteArray,
+        fileName: String,
+        type: String
+    ): Message {
         val path = "$conversationId/${System.currentTimeMillis()}_$fileName"
         supabase.storage.from("media").upload(path, bytes)
         val publicUrl = supabase.storage.from("media").publicUrl(path)
-        supabase.from("messages").insert(
+        return supabase.from("messages").insert(
             Message(
                 conversationId = conversationId,
                 senderId = currentUserId,
                 mediaUrl = publicUrl,
                 mediaType = type
             )
-        )
+        ) { select() }.decodeSingle<Message>()
     }
 
     // ---------- TEMPS RÉEL ----------
-    /** Flow qui émet chaque nouveau message inséré dans la conversation. */
+    /**
+     * Flow qui émet les messages insérés ET mis à jour (statut lu) dans la conversation.
+     * Les UPDATE permettent à l'expéditeur de voir passer ✓ -> ✓✓ en direct.
+     */
     suspend fun observeMessages(conversationId: String): Flow<Message> {
         val channel = supabase.channel("messages_$conversationId")
-        val flow = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+        val inserts = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
+            table = "messages"
+            filter("conversation_id", FilterOperator.EQ, conversationId)
+        }.map { action -> json.decodeFromString<Message>(action.record.toString()) }
+        val updates = channel.postgresChangeFlow<PostgresAction.Update>(schema = "public") {
             table = "messages"
             filter("conversation_id", FilterOperator.EQ, conversationId)
         }.map { action -> json.decodeFromString<Message>(action.record.toString()) }
         channel.subscribe()
-        return flow
+        return merge(inserts, updates)
     }
 }

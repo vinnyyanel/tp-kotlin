@@ -30,10 +30,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.esgis.chatapp.data.Message
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +55,19 @@ fun ChatScreen(
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
     var input by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val imagePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch(Dispatchers.IO) {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                if (bytes != null) viewModel.sendImage(bytes, "photo.jpg")
+            }
+        }
+    }
 
     val title = if (state.isAiChat) "🤖 Assistant IA · ${state.persona.label}" else "Discussion"
 
@@ -100,6 +123,15 @@ fun ChatScreen(
                     .padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                TextButton(
+                    onClick = {
+                        imagePicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
+                ) {
+                    Text("📎", fontSize = 20.sp)
+                }
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
@@ -139,7 +171,18 @@ private fun MessageBubble(msg: Message, isMine: Boolean) {
             modifier = Modifier.widthIn(max = 300.dp)
         ) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Text(text = msg.content ?: "")
+                if (msg.mediaType == "image" && msg.mediaUrl != null) {
+                    AsyncImage(
+                        model = msg.mediaUrl,
+                        contentDescription = "Photo",
+                        modifier = Modifier
+                            .widthIn(max = 240.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                    )
+                }
+                if (!msg.content.isNullOrBlank()) {
+                    Text(text = msg.content)
+                }
                 if (isMine) {
                     Text(
                         text = if (msg.status == "read") "✓✓ lu" else "✓ envoyé",

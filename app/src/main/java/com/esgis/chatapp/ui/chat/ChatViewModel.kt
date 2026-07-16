@@ -91,6 +91,15 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
         }
     }
 
+    /** Envoie une photo (bytes déjà lus depuis l'URI). */
+    fun sendImage(bytes: ByteArray, fileName: String) {
+        viewModelScope.launch {
+            runCatching { repo.uploadMedia(conversationId, bytes, fileName, "image") }
+                .onSuccess { addOrUpdate(it) }
+                .onFailure { e -> _state.update { it.copy(error = e.message ?: "Envoi de l'image impossible.") } }
+        }
+    }
+
     private suspend fun streamAiReply() {
         _state.update { it.copy(aiTyping = true) }
 
