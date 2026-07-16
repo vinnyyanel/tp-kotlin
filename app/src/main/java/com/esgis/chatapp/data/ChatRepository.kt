@@ -62,6 +62,9 @@ class ChatRepository {
             filter { eq("id", userId) }
         }.decodeSingleOrNull<Profile>()
 
+    /** Nom d'affichage d'un utilisateur (pour l'en-tête du chat). */
+    suspend fun getUsername(userId: String): String? = getProfile(userId)?.username
+
     // ---------- CONVERSATIONS ----------
     suspend fun getConversation(conversationId: String): Conversation? =
         supabase.from("conversations").select {

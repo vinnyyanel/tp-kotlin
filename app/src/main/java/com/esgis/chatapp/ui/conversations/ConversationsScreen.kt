@@ -2,7 +2,8 @@ package com.esgis.chatapp.ui.conversations
 
 import android.Manifest
 import android.os.Build
-import androidx.compose.foundation.background
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,15 +12,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -36,19 +41,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.esgis.chatapp.data.ConversationUi
 import com.esgis.chatapp.data.MessageNotifier
 import com.esgis.chatapp.data.Profile
 import com.esgis.chatapp.ui.chat.PersonaPickerDialog
+import com.esgis.chatapp.ui.components.Avatar
+import com.esgis.chatapp.ui.theme.OnlineGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +75,6 @@ fun ConversationsScreen(
         }
     }
 
-    // Notifications locales : permission (Android 13+) + démarrage de l'écoute globale.
     val context = LocalContext.current
     val notifPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -89,10 +90,14 @@ fun ConversationsScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text("Conversations") },
+                title = { Text("Discussions") },
                 actions = {
-                    TextButton(onClick = { showPersonaPicker = true }) { Text("🤖 IA") }
-                    TextButton(onClick = { viewModel.logout(onLoggedOut) }) { Text("Quitter") }
+                    IconButton(onClick = { showPersonaPicker = true }) {
+                        Icon(Icons.Rounded.SmartToy, contentDescription = "Nouveau chat IA")
+                    }
+                    IconButton(onClick = { viewModel.logout(onLoggedOut) }) {
+                        Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = "Se déconnecter")
+                    }
                 }
             )
         },
@@ -101,7 +106,7 @@ fun ConversationsScreen(
                 viewModel.loadContacts()
                 showContacts = true
             }) {
-                Text("＋", fontSize = 24.sp)
+                Icon(Icons.Rounded.Add, contentDescription = "Nouvelle conversation")
             }
         }
     ) { padding ->
@@ -111,24 +116,21 @@ fun ConversationsScreen(
                 .padding(padding)
         ) {
             when (val s = state) {
-                is ConversationsUiState.Loading -> {
+                is ConversationsUiState.Loading ->
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
-                }
 
-                is ConversationsUiState.Error -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Erreur : ${s.message}", color = MaterialTheme.colorScheme.error)
-                        TextButton(onClick = { viewModel.refresh() }) { Text("Réessayer") }
-                    }
+                is ConversationsUiState.Error -> Column(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Erreur : ${s.message}", color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = { viewModel.refresh() }) { Text("Réessayer") }
                 }
 
                 is ConversationsUiState.Data -> {
                     if (s.conversations.isEmpty()) {
                         Text(
-                            "Aucune conversation.\nTouche 🤖 IA ou ＋ pour commencer.",
+                            "Aucune conversation pour l'instant.\nTouche l'icône IA ou le bouton + pour commencer.",
                             modifier = Modifier.align(Alignment.Center).padding(24.dp)
                         )
                     } else {
@@ -136,7 +138,7 @@ fun ConversationsScreen(
                             items(s.conversations, key = { it.id }) { conv ->
                                 val isOnline = conv.otherUserId != null && conv.otherUserId in onlineUsers
                                 ConversationRow(conv, isOnline) { onOpenChat(conv.id) }
-                                HorizontalDivider()
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                             }
                         }
                     }
@@ -173,44 +175,33 @@ private fun ConversationRow(conv: ConversationUi, isOnline: Boolean, onClick: ()
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (conv.isAiChat) Text("🤖  ")
-                Text(
-                    text = conv.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            when {
-                conv.isAiChat -> Text(
-                    "Agent IA",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                isOnline -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .size(9.dp)
-                            .clip(CircleShape)
-                            .background(OnlineGreen)
-                    )
-                    Text(
-                        "  en ligne",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OnlineGreen
-                    )
+        Avatar(
+            label = conv.title,
+            isAi = conv.isAiChat,
+            online = isOnline && !conv.isAiChat
+        )
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(
+                text = conv.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = when {
+                    conv.isAiChat -> "Assistant IA"
+                    isOnline -> "en ligne"
+                    else -> "hors ligne"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = when {
+                    conv.isAiChat -> MaterialTheme.colorScheme.secondary
+                    isOnline -> OnlineGreen
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
-                else -> Text(
-                    "hors ligne",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            )
         }
         conv.lastMessageAt?.let {
             Text(
@@ -237,14 +228,17 @@ private fun ContactsDialog(
             } else {
                 LazyColumn {
                     items(contacts, key = { it.id }) { profile ->
-                        Text(
-                            text = profile.username,
-                            style = MaterialTheme.typography.titleMedium,
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onPick(profile) }
-                                .padding(vertical = 12.dp)
-                        )
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Avatar(label = profile.username, size = 38.dp)
+                            Text(profile.username, style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                 }
             }
@@ -253,8 +247,6 @@ private fun ContactsDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("Fermer") } }
     )
 }
-
-private val OnlineGreen = Color(0xFF2FBF4B)
 
 /** ISO 8601 -> "HH:mm" (best-effort, sans dépendance date). */
 private fun formatTime(iso: String): String {

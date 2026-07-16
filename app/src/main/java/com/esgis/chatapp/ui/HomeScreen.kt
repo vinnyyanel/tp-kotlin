@@ -3,6 +3,10 @@ package com.esgis.chatapp.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Forum
+import androidx.compose.material.icons.rounded.People
+import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -34,13 +38,13 @@ fun HomeScreen(
                 NavigationBarItem(
                     selected = tab == 0,
                     onClick = { tab = 0 },
-                    icon = { Text("💬") },
+                    icon = { Icon(Icons.Rounded.Forum, contentDescription = null) },
                     label = { Text("Discussions") }
                 )
                 NavigationBarItem(
                     selected = tab == 1,
                     onClick = { tab = 1 },
-                    icon = { Text("👥") },
+                    icon = { Icon(Icons.Rounded.People, contentDescription = null) },
                     label = { Text("Utilisateurs") }
                 )
             }
