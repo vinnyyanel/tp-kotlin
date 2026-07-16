@@ -6,9 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.esgis.chatapp.data.AiPersona
 import com.esgis.chatapp.data.GeminiService
 import com.esgis.chatapp.data.Message
+import com.esgis.chatapp.data.MessageNotifier
+import com.esgis.chatapp.data.RealtimeMessages
 import com.esgis.chatapp.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -36,7 +40,15 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
     }
 
     init {
+        MessageNotifier.activeConversationId = conversationId
         bootstrap()
+    }
+
+    override fun onCleared() {
+        if (MessageNotifier.activeConversationId == conversationId) {
+            MessageNotifier.activeConversationId = null
+        }
+        super.onCleared()
     }
 
     private fun bootstrap() {
@@ -60,15 +72,16 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
     }
 
     private fun observeRealtime() {
+        RealtimeMessages.start()
         viewModelScope.launch {
-            runCatching {
-                repo.observeMessages(conversationId).collect { msg ->
+            merge(RealtimeMessages.inserts, RealtimeMessages.updates)
+                .filter { it.conversationId == conversationId }
+                .collect { msg ->
                     addOrUpdate(msg)
                     if (msg.senderId != myId) {
                         runCatching { repo.markConversationRead(conversationId) }
                     }
                 }
-            }
         }
     }
 
@@ -101,6 +114,15 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
             runCatching { repo.uploadMedia(conversationId, bytes, fileName, "image") }
                 .onSuccess { addOrUpdate(it) }
                 .onFailure { e -> _state.update { it.copy(error = e.message ?: "Envoi de l'image impossible.") } }
+        }
+    }
+
+    /** Envoie un message audio (bytes de l'enregistrement). */
+    fun sendAudio(bytes: ByteArray, fileName: String) {
+        viewModelScope.launch {
+            runCatching { repo.uploadMedia(conversationId, bytes, fileName, "audio") }
+                .onSuccess { addOrUpdate(it) }
+                .onFailure { e -> _state.update { it.copy(error = e.message ?: "Envoi de l'audio impossible.") } }
         }
     }
 

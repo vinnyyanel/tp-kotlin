@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.esgis.chatapp.data.AiPersona
 import com.esgis.chatapp.data.ConversationUi
+import com.esgis.chatapp.data.MessageNotifier
 import com.esgis.chatapp.data.PresenceManager
+import com.esgis.chatapp.data.RealtimeMessages
 import com.esgis.chatapp.data.Profile
 import com.esgis.chatapp.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +34,8 @@ class ConversationsViewModel : ViewModel() {
 
     /** Ensemble des utilisateurs actuellement en ligne (présence Realtime). */
     val onlineUsers = PresenceManager.online
+
+    val myId: String? = repo.currentUserId
 
     init {
         repo.currentUserId?.let { PresenceManager.start(it) }
@@ -74,6 +78,8 @@ class ConversationsViewModel : ViewModel() {
     fun logout(onDone: () -> Unit) {
         viewModelScope.launch {
             PresenceManager.stop()
+            MessageNotifier.stop()
+            RealtimeMessages.stop()
             runCatching { repo.signOut() }
             onDone()
         }

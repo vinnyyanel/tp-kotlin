@@ -1,5 +1,7 @@
 package com.esgis.chatapp.ui.conversations
 
+import android.Manifest
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,11 +38,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.esgis.chatapp.data.ConversationUi
+import com.esgis.chatapp.data.MessageNotifier
 import com.esgis.chatapp.data.Profile
 import com.esgis.chatapp.ui.chat.PersonaPickerDialog
 
@@ -65,6 +71,18 @@ fun ConversationsScreen(
             snackbar.showSnackbar(it)
             viewModel.clearMessage()
         }
+    }
+
+    // Notifications locales : permission (Android 13+) + démarrage de l'écoute globale.
+    val context = LocalContext.current
+    val notifPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        viewModel.myId?.let { MessageNotifier.start(context.applicationContext, it) }
     }
 
     Scaffold(
