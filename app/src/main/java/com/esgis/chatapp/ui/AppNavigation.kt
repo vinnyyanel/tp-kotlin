@@ -8,11 +8,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.esgis.chatapp.ui.auth.AuthScreen
 import com.esgis.chatapp.ui.chat.ChatScreen
-import com.esgis.chatapp.ui.conversations.ConversationsScreen
 
 object Routes {
     const val AUTH = "auth"
-    const val CONVERSATIONS = "conversations"
+    const val HOME = "home"
     const val CHAT = "chat/{conversationId}"
     fun chat(conversationId: String) = "chat/$conversationId"
 }
@@ -26,15 +25,15 @@ fun AppNavigation() {
         composable(Routes.AUTH) {
             AuthScreen(
                 onAuthenticated = {
-                    navController.navigate(Routes.CONVERSATIONS) {
+                    navController.navigate(Routes.HOME) {
                         popUpTo(Routes.AUTH) { inclusive = true }
                     }
                 }
             )
         }
 
-        composable(Routes.CONVERSATIONS) {
-            ConversationsScreen(
+        composable(Routes.HOME) {
+            HomeScreen(
                 onOpenChat = { id -> navController.navigate(Routes.chat(id)) },
                 onLoggedOut = {
                     navController.navigate(Routes.AUTH) {
