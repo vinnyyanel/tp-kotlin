@@ -7,6 +7,7 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.RealtimeChannel
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
 import io.github.jan.supabase.storage.storage
@@ -177,6 +178,7 @@ class ChatRepository {
             filter {
                 eq("conversation_id", conversationId)
                 neq("sender_id", me)
+                neq("status", "read")
             }
         }
     }
@@ -203,12 +205,16 @@ class ChatRepository {
     }
 
     // ---------- TEMPS RÉEL ----------
+    /** Canal Realtime + flux de messages associé (à fermer via closeChannel). */
+    data class MessageStream(val channel: RealtimeChannel, val messages: Flow<Message>)
+
     /**
-     * Flow qui émet les messages insérés ET mis à jour (statut lu) dans la conversation.
+     * Émet les messages insérés ET mis à jour (statut lu) dans la conversation.
      * Les UPDATE permettent à l'expéditeur de voir passer ✓ -> ✓✓ en direct.
+     * Nom de canal unique -> pas de collision si on rouvre la même conversation.
      */
-    suspend fun observeMessages(conversationId: String): Flow<Message> {
-        val channel = supabase.channel("messages_$conversationId")
+    suspend fun observeMessages(conversationId: String): MessageStream {
+        val channel = supabase.channel("messages_${conversationId}_${System.nanoTime()}")
         val inserts = channel.postgresChangeFlow<PostgresAction.Insert>(schema = "public") {
             table = "messages"
             filter("conversation_id", FilterOperator.EQ, conversationId)
@@ -218,6 +224,11 @@ class ChatRepository {
             filter("conversation_id", FilterOperator.EQ, conversationId)
         }.map { action -> json.decodeFromString<Message>(action.record.toString()) }
         channel.subscribe()
-        return merge(inserts, updates)
+        return MessageStream(channel, merge(inserts, updates))
+    }
+
+    /** Ferme un canal Realtime (à la sortie d'un écran de chat). */
+    suspend fun closeChannel(channel: RealtimeChannel) {
+        runCatching { channel.unsubscribe() }
     }
 }

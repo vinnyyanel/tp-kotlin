@@ -36,12 +36,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.Manifest
+import android.content.pm.PackageManager
+import android.media.MediaPlayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.esgis.chatapp.data.AudioRecorder
 import com.esgis.chatapp.data.Message
 import com.esgis.chatapp.data.PresenceManager
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +73,30 @@ fun ChatScreen(
             scope.launch(Dispatchers.IO) {
                 val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 if (bytes != null) viewModel.sendImage(bytes, "photo.jpg")
+            }
+        }
+    }
+
+    val recorder = remember { AudioRecorder(context) }
+    var recording by remember { mutableStateOf(false) }
+    val audioPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted && recorder.start()) recording = true
+    }
+    fun toggleRecording() {
+        if (recording) {
+            val bytes = recorder.stop()
+            recording = false
+            if (bytes != null) viewModel.sendAudio(bytes, "audio.m4a")
+        } else {
+            val granted = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                if (recorder.start()) recording = true
+            } else {
+                audioPermission.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
     }
@@ -148,6 +178,14 @@ fun ChatScreen(
                 ) {
                     Text("📎", fontSize = 20.sp)
                 }
+                TextButton(onClick = { toggleRecording() }) {
+                    Text(
+                        if (recording) "⏹" else "🎤",
+                        fontSize = 20.sp,
+                        color = if (recording) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
@@ -166,6 +204,19 @@ fun ChatScreen(
                     Text("Envoyer", fontWeight = FontWeight.SemiBold)
                 }
             }
+        }
+    }
+}
+
+/** Lecture d'un message audio en streaming depuis son URL publique. */
+private fun playAudioUrl(url: String) {
+    runCatching {
+        MediaPlayer().apply {
+            setDataSource(url)
+            setOnPreparedListener { start() }
+            setOnCompletionListener { it.release() }
+            setOnErrorListener { mp, _, _ -> mp.release(); true }
+            prepareAsync()
         }
     }
 }
@@ -195,6 +246,14 @@ private fun MessageBubble(msg: Message, isMine: Boolean) {
                             .widthIn(max = 240.dp)
                             .clip(RoundedCornerShape(10.dp))
                     )
+                }
+                if (msg.mediaType == "audio" && msg.mediaUrl != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { playAudioUrl(msg.mediaUrl) }
+                    ) {
+                        Text("▶  Message audio", fontWeight = FontWeight.Medium)
+                    }
                 }
                 if (!msg.content.isNullOrBlank()) {
                     Text(text = msg.content)
