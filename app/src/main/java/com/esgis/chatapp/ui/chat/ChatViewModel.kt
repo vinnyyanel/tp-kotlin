@@ -18,7 +18,8 @@ data class ChatUiState(
     val persona: AiPersona = AiPersona.GENERAL,
     val aiTyping: Boolean = false,
     val loading: Boolean = true,
-    val error: String? = null
+    val error: String? = null,
+    val otherUserId: String? = null
 )
 
 class ChatViewModel(private val conversationId: String) : ViewModel() {
@@ -42,12 +43,15 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
         viewModelScope.launch {
             val conv = runCatching { repo.getConversation(conversationId) }.getOrNull()
             val msgs = runCatching { repo.getMessages(conversationId) }.getOrElse { emptyList() }
+            val other = if (conv?.isAiChat == true) null
+            else runCatching { repo.getOtherParticipantId(conversationId) }.getOrNull()
             _state.update {
                 it.copy(
                     messages = msgs,
                     isAiChat = conv?.isAiChat == true,
                     persona = AiPersona.fromId(conv?.aiPersona),
-                    loading = false
+                    loading = false,
+                    otherUserId = other
                 )
             }
             runCatching { repo.markConversationRead(conversationId) }

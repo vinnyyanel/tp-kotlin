@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.esgis.chatapp.data.Message
+import com.esgis.chatapp.data.PresenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -70,6 +72,8 @@ fun ChatScreen(
     }
 
     val title = if (state.isAiChat) "🤖 Assistant IA · ${state.persona.label}" else "Discussion"
+    val online by PresenceManager.online.collectAsState()
+    val otherOnline = state.otherUserId != null && state.otherUserId in online
 
     // Auto-scroll vers le dernier message.
     LaunchedEffect(state.messages.size, state.aiTyping) {
@@ -80,7 +84,19 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = {
+                    Column {
+                        Text(title)
+                        if (!state.isAiChat) {
+                            Text(
+                                text = if (otherOnline) "en ligne" else "hors ligne",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (otherOnline) Color(0xFF2FBF4B)
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     TextButton(onClick = onBack) { Text("←") }
                 }
