@@ -36,8 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.esgis.chatapp.data.Profile
-
-private val OnlineGreen = Color(0xFF2FBF4B)
+import com.esgis.chatapp.ui.components.Avatar
+import com.esgis.chatapp.ui.theme.OnlineGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,33 +110,7 @@ private fun UserRow(user: Profile, isOnline: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = user.username.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-            if (isOnline) {
-                Box(
-                    modifier = Modifier
-                        .size(13.dp)
-                        .align(Alignment.BottomEnd)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(OnlineGreen))
-                }
-            }
-        }
+        Avatar(label = user.username, online = isOnline)
         Column(Modifier.padding(start = 12.dp).fillMaxWidth(), verticalArrangement = Arrangement.Center) {
             Text(
                 text = user.username,
