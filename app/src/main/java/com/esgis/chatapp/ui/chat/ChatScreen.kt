@@ -2,7 +2,6 @@ package com.esgis.chatapp.ui.chat
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.media.MediaPlayer
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -61,9 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.esgis.chatapp.data.AudioRecorder
 import com.esgis.chatapp.data.Message
-import com.esgis.chatapp.data.PresenceManager
 import com.esgis.chatapp.ui.components.Avatar
 import com.esgis.chatapp.ui.theme.OnlineGreen
 import com.esgis.chatapp.ui.theme.ReadBlue
@@ -75,7 +72,9 @@ import kotlinx.coroutines.launch
 fun ChatScreen(
     conversationId: String,
     onBack: () -> Unit,
-    viewModel: ChatViewModel = viewModel(factory = ChatViewModelFactory(conversationId))
+    viewModel: ChatViewModel = viewModel(
+        factory = ChatViewModelFactory(conversationId, LocalContext.current)
+    )
 ) {
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
@@ -94,34 +93,27 @@ fun ChatScreen(
         }
     }
 
-    val recorder = remember { AudioRecorder(context) }
-    var recording by remember { mutableStateOf(false) }
+    // La permission micro est une préoccupation Android : elle reste dans la Vue,
+    // mais l'enregistrement lui-même est piloté par le ViewModel.
     val audioPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted && recorder.start()) recording = true
-    }
-    fun toggleRecording() {
-        if (recording) {
-            val bytes = recorder.stop()
-            recording = false
-            if (bytes != null) viewModel.sendAudio(bytes, "audio.m4a")
+    ) { granted -> if (granted) viewModel.startRecording() }
+
+    fun onMicClick() {
+        if (state.recording) {
+            viewModel.stopRecordingAndSend()
         } else {
             val granted = ContextCompat.checkSelfPermission(
                 context, Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED
-            if (granted) {
-                if (recorder.start()) recording = true
-            } else {
-                audioPermission.launch(Manifest.permission.RECORD_AUDIO)
-            }
+            if (granted) viewModel.startRecording()
+            else audioPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
     val title = if (state.isAiChat) "Assistant IA · ${state.persona.label}"
     else state.otherName ?: "Discussion"
-    val online by PresenceManager.online.collectAsState()
-    val otherOnline = state.otherUserId != null && state.otherUserId in online
+    val otherOnline by viewModel.otherOnline.collectAsState()
 
     LaunchedEffect(state.messages.size, state.aiTyping) {
         val count = state.messages.size
@@ -177,7 +169,11 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         items(state.messages, key = { it.id ?: it.hashCode().toString() }) { msg ->
-                            MessageBubble(msg = msg, isMine = msg.senderId == viewModel.myId && !msg.isFromAi)
+                            MessageBubble(
+                                msg = msg,
+                                isMine = msg.senderId == viewModel.myId && !msg.isFromAi,
+                                onPlayAudio = viewModel::playAudio
+                            )
                         }
                     }
                 }
@@ -195,7 +191,7 @@ fun ChatScreen(
             InputBar(
                 input = input,
                 onInputChange = { input = it },
-                recording = recording,
+                recording = state.recording,
                 onAttach = {
                     imagePicker.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -206,7 +202,7 @@ fun ChatScreen(
                     input = ""
                     viewModel.send(text)
                 },
-                onMic = { toggleRecording() }
+                onMic = { onMicClick() }
             )
         }
     }
@@ -282,20 +278,8 @@ private fun InputBar(
     }
 }
 
-private fun playAudioUrl(url: String) {
-    runCatching {
-        MediaPlayer().apply {
-            setDataSource(url)
-            setOnPreparedListener { start() }
-            setOnCompletionListener { it.release() }
-            setOnErrorListener { mp, _, _ -> mp.release(); true }
-            prepareAsync()
-        }
-    }
-}
-
 @Composable
-private fun MessageBubble(msg: Message, isMine: Boolean) {
+private fun MessageBubble(msg: Message, isMine: Boolean, onPlayAudio: (String) -> Unit) {
     val bubbleColor = when {
         isMine -> MaterialTheme.colorScheme.primaryContainer
         msg.isFromAi -> MaterialTheme.colorScheme.secondaryContainer
@@ -331,7 +315,7 @@ private fun MessageBubble(msg: Message, isMine: Boolean) {
                 if (msg.mediaType == "audio" && msg.mediaUrl != null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { playAudioUrl(msg.mediaUrl) }
+                        modifier = Modifier.clickable { onPlayAudio(msg.mediaUrl) }
                     ) {
                         Icon(
                             Icons.Rounded.PlayArrow,

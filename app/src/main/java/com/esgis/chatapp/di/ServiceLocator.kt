@@ -1,11 +1,12 @@
 package com.esgis.chatapp.di
 
 import com.esgis.chatapp.data.ChatRepository
+import com.esgis.chatapp.data.SupabaseChatRepository
 
 /**
  * DI minimaliste : un simple singleton (pas de Hilt, cf. cahier des charges).
- * Toute l'app partage la même instance de ChatRepository.
+ * Expose l'abstraction [ChatRepository] — l'implémentation reste interchangeable.
  */
 object ServiceLocator {
-    val repository: ChatRepository by lazy { ChatRepository() }
+    val repository: ChatRepository by lazy { SupabaseChatRepository() }
 }

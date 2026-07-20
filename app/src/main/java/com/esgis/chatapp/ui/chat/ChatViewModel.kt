@@ -1,18 +1,27 @@
 package com.esgis.chatapp.ui.chat
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.esgis.chatapp.data.AiPersona
+import com.esgis.chatapp.data.AudioPlayer
+import com.esgis.chatapp.data.AudioRecorder
+import com.esgis.chatapp.data.ChatRepository
 import com.esgis.chatapp.data.GeminiService
 import com.esgis.chatapp.data.Message
 import com.esgis.chatapp.data.MessageNotifier
+import com.esgis.chatapp.data.PresenceManager
 import com.esgis.chatapp.data.RealtimeMessages
 import com.esgis.chatapp.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -24,16 +33,27 @@ data class ChatUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val otherUserId: String? = null,
-    val otherName: String? = null
+    val otherName: String? = null,
+    val recording: Boolean = false
 )
 
-class ChatViewModel(private val conversationId: String) : ViewModel() {
+class ChatViewModel(
+    private val conversationId: String,
+    private val recorder: AudioRecorder,
+    private val player: AudioPlayer,
+    private val repo: ChatRepository = ServiceLocator.repository
+) : ViewModel() {
 
-    private val repo = ServiceLocator.repository
     val myId: String? = repo.currentUserId
 
     private val _state = MutableStateFlow(ChatUiState())
     val state = _state.asStateFlow()
+
+    /** true si l'autre participant est en ligne (la Vue n'accède pas à PresenceManager). */
+    val otherOnline: StateFlow<Boolean> =
+        combine(PresenceManager.online, _state) { online, st ->
+            st.otherUserId != null && st.otherUserId in online
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private companion object {
         const val TEMP_AI_ID = "temp-ai-streaming"
@@ -49,6 +69,7 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
         if (MessageNotifier.activeConversationId == conversationId) {
             MessageNotifier.activeConversationId = null
         }
+        player.stop()
         super.onCleared()
     }
 
@@ -129,6 +150,19 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
         }
     }
 
+    // ---------- AUDIO (piloté par le ViewModel, pas par la Vue) ----------
+    fun startRecording() {
+        if (recorder.start()) _state.update { it.copy(recording = true) }
+    }
+
+    fun stopRecordingAndSend() {
+        val bytes = recorder.stop()
+        _state.update { it.copy(recording = false) }
+        if (bytes != null) sendAudio(bytes, "audio.m4a")
+    }
+
+    fun playAudio(url: String) = player.play(url)
+
     private suspend fun streamAiReply() {
         _state.update { it.copy(aiTyping = true) }
 
@@ -179,9 +213,21 @@ class ChatViewModel(private val conversationId: String) : ViewModel() {
     }
 }
 
-/** Factory pour injecter le conversationId (pas de Hilt). */
-class ChatViewModelFactory(private val conversationId: String) : ViewModelProvider.Factory {
+/**
+ * Factory : fournit le conversationId et les dépendances Android (audio),
+ * pour que le ViewModel reste testable avec des doublures.
+ */
+class ChatViewModelFactory(
+    private val conversationId: String,
+    context: Context
+) : ViewModelProvider.Factory {
+    private val appContext = context.applicationContext
+
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T =
-        ChatViewModel(conversationId) as T
+        ChatViewModel(
+            conversationId = conversationId,
+            recorder = AudioRecorder(appContext),
+            player = AudioPlayer()
+        ) as T
 }

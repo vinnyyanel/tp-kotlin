@@ -2,10 +2,12 @@ package com.esgis.chatapp.ui.users
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.esgis.chatapp.data.ChatRepository
 import com.esgis.chatapp.data.Profile
 import com.esgis.chatapp.data.PresenceManager
 import com.esgis.chatapp.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -15,15 +17,14 @@ sealed interface UsersUiState {
     data class Error(val message: String) : UsersUiState
 }
 
-class UsersViewModel : ViewModel() {
-
-    private val repo = ServiceLocator.repository
+class UsersViewModel(
+    private val repo: ChatRepository = ServiceLocator.repository,
+    /** Injectable pour les tests (par défaut : présence Realtime). */
+    val onlineUsers: StateFlow<Set<String>> = PresenceManager.online
+) : ViewModel() {
 
     private val _state = MutableStateFlow<UsersUiState>(UsersUiState.Loading)
     val state = _state.asStateFlow()
-
-    /** Utilisateurs actuellement en ligne (présence Realtime). */
-    val onlineUsers = PresenceManager.online
 
     private val _message = MutableStateFlow<String?>(null)
     val message = _message.asStateFlow()

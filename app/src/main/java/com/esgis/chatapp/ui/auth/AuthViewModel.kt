@@ -2,6 +2,7 @@ package com.esgis.chatapp.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.esgis.chatapp.data.ChatRepository
 import com.esgis.chatapp.di.ServiceLocator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,9 +15,9 @@ sealed interface AuthUiState {
     data class Error(val message: String) : AuthUiState
 }
 
-class AuthViewModel : ViewModel() {
-
-    private val repo = ServiceLocator.repository
+class AuthViewModel(
+    private val repo: ChatRepository = ServiceLocator.repository
+) : ViewModel() {
 
     private val _state = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val state = _state.asStateFlow()

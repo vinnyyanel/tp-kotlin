@@ -1,8 +1,11 @@
 package com.esgis.chatapp.ui.conversations
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.esgis.chatapp.data.AiPersona
+import com.esgis.chatapp.data.ChatRepository
 import com.esgis.chatapp.data.ConversationUi
 import com.esgis.chatapp.data.MessageNotifier
 import com.esgis.chatapp.data.PresenceManager
@@ -19,9 +22,11 @@ sealed interface ConversationsUiState {
     data class Error(val message: String) : ConversationsUiState
 }
 
-class ConversationsViewModel : ViewModel() {
-
-    private val repo = ServiceLocator.repository
+class ConversationsViewModel(
+    private val repo: ChatRepository = ServiceLocator.repository,
+    /** Démarrage des notifications locales (fourni par la factory, qui a le Context). */
+    private val startNotifier: (String) -> Unit = {}
+) : ViewModel() {
 
     private val _state = MutableStateFlow<ConversationsUiState>(ConversationsUiState.Loading)
     val state = _state.asStateFlow()
@@ -38,7 +43,10 @@ class ConversationsViewModel : ViewModel() {
     val myId: String? = repo.currentUserId
 
     init {
-        repo.currentUserId?.let { PresenceManager.start(it) }
+        repo.currentUserId?.let {
+            PresenceManager.start(it)
+            startNotifier(it)
+        }
         refresh()
     }
 
@@ -88,4 +96,18 @@ class ConversationsViewModel : ViewModel() {
     fun clearMessage() {
         _message.value = null
     }
+}
+
+/**
+ * Composition root de l'écran : câble les dépendances Android (Context pour les
+ * notifications) sans que la Vue ni le ViewModel n'aient à les connaître.
+ */
+class ConversationsViewModelFactory(context: Context) : ViewModelProvider.Factory {
+    private val appContext = context.applicationContext
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : ViewModel> create(modelClass: Class<T>): T =
+        ConversationsViewModel(
+            startNotifier = { userId -> MessageNotifier.start(appContext, userId) }
+        ) as T
 }
