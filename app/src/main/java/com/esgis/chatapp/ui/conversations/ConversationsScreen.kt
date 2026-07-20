@@ -46,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.esgis.chatapp.data.ConversationUi
-import com.esgis.chatapp.data.MessageNotifier
 import com.esgis.chatapp.data.Profile
 import com.esgis.chatapp.ui.chat.PersonaPickerDialog
 import com.esgis.chatapp.ui.components.Avatar
@@ -57,7 +56,9 @@ import com.esgis.chatapp.ui.theme.OnlineGreen
 fun ConversationsScreen(
     onOpenChat: (String) -> Unit,
     onLoggedOut: () -> Unit,
-    viewModel: ConversationsViewModel = viewModel()
+    viewModel: ConversationsViewModel = viewModel(
+        factory = ConversationsViewModelFactory(LocalContext.current)
+    )
 ) {
     val state by viewModel.state.collectAsState()
     val contacts by viewModel.contacts.collectAsState()
@@ -75,7 +76,8 @@ fun ConversationsScreen(
         }
     }
 
-    val context = LocalContext.current
+    // Seule préoccupation Android restant dans la Vue : demander la permission.
+    // Le démarrage des notifications est fait par le ViewModel.
     val notifPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
@@ -83,7 +85,6 @@ fun ConversationsScreen(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        viewModel.myId?.let { MessageNotifier.start(context.applicationContext, it) }
     }
 
     Scaffold(
